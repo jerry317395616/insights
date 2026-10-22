@@ -81,6 +81,36 @@ describe('the three axis types', () => {
 	})
 })
 
+const fiscalYear = {
+	name: 'order_date',
+	type: 'Date' as const,
+	granularity: 'fiscal_year' as const,
+}
+
+/** The x axis labels echarts draws from the option frappe-ui builds of `props`. */
+function drawnLabels(props: any): string[] {
+	const tokens = resolveChartTokens()
+	const normalized = normalizeAxisChartProps(props)
+	const option = buildAxisChartOption(
+		{ ...normalized.config, type: 'line' },
+		{ tokens, hiddenSeries: [], width: 600, format: normalized.format },
+	)
+	const chart = echarts.init(null as any, null as any, {
+		renderer: 'svg',
+		ssr: true,
+		width: 600,
+		height: 400,
+	})
+	chart.setOption({ ...option, animation: false })
+	const labels = (chart as any)
+		.getModel()
+		.getComponent('xAxis')
+		.axis.getViewLabels()
+		.map((label: any) => label.formattedLabel)
+	chart.dispose()
+	return labels
+}
+
 describe('the category axis', () => {
 	// @feature charts.x-axis
 	it('reads a text Dimension as categories', () => {
@@ -101,14 +131,47 @@ describe('the category axis', () => {
 	})
 
 	// @feature charts.x-axis
-	it('prints a fiscal year itself, which a plain calendar has no grain for', () => {
+	it('reads a fiscal year as a timeline, printed with its own label', () => {
 		const xAxis = propsOf({
 			type: 'Line',
-			dimension: { name: 'order_date', type: 'Date', granularity: 'fiscal_year' },
+			dimension: fiscalYear,
 			measures: ['revenue'],
 		}).xAxis
-		expect(xAxis.timeGrain).toBeUndefined()
+		expect(xAxis.type).toBe('time')
 		expect(xAxis.format('2026-06-01')).toMatch(/^FY /)
+	})
+
+	// @feature charts.x-axis
+	it('ticks each fiscal year once, at its own row', () => {
+		const years = ['2024-04-01', '2025-04-01', '2026-04-01']
+		const props = propsOf({
+			type: 'Line',
+			dimension: fiscalYear,
+			measures: ['revenue'],
+			categories: years,
+			readings: { revenue: [1, 2, 3] },
+		})
+		const { axisLabel, axisTick } = props.xAxis.echartOptions
+		expect(axisLabel.customValues).toEqual(years)
+		expect(axisTick.customValues).toEqual(years)
+		expect(drawnLabels(props)).toEqual(years.map((year) => props.xAxis.format(year)))
+		expect(new Set(drawnLabels(props)).size).toBe(3)
+	})
+
+	// @feature charts.x-axis
+	it('leaves a missing fiscal year a gap, not a tick', () => {
+		const props = propsOf({
+			type: 'Line',
+			dimension: fiscalYear,
+			measures: ['revenue'],
+			categories: ['2023-04-01', '2025-04-01'],
+			readings: { revenue: [1, 3] },
+		})
+		expect(props.xAxis.echartOptions.axisTick.customValues).toEqual([
+			'2023-04-01',
+			'2025-04-01',
+		])
+		expect(drawnLabels(props)).toHaveLength(2)
 	})
 
 	// @feature charts.x-axis
@@ -1202,6 +1265,16 @@ describe('whether a series is offered a trend line', () => {
 		)
 
 	// @feature charts.trend-line
+	it('offers a fiscal-year line a trend line, as a timeline', () => {
+		const config = configOf({
+			type: 'Line',
+			dimension: fiscalYear,
+			measures: [{ name: 'revenue', trendLine: true }],
+		})
+		expect(offered(config, 'line')).toEqual([true])
+	})
+
+	// @feature charts.trend-line
 	it('answers per series, as the adapter draws', () => {
 		expect(offered(configOf({ stacked: true }))).toEqual([true])
 		expect(offered(configOf({ type: 'Line', stacked: true }), 'line')).toEqual([true])
@@ -1367,4 +1440,63 @@ describe('the option frappe-ui builds', () => {
 			chart.dispose()
 		},
 	)
+})
+
+describe('a timeline', () => {
+	// @feature charts.x-axis
+	it('ticks a day timeline only on the days it steps to', () => {
+		// echarts 6.1.0 also ticks one step past each month's last day, a day or
+		// two after the next month starts, and that tick's label hides the
+		// month's. `patches/echarts+6.1.0.patch` drops it.
+		const day = { name: 'day', type: 'Date' as const, granularity: 'day' as const }
+		const end = Date.UTC(2026, 9, 6)
+		const categories = Array.from({ length: 120 }, (_, index) =>
+			new Date(end - (119 - index) * 86_400_000).toISOString().slice(0, 10),
+		)
+		const input = axisChart({
+			type: 'Line',
+			dimension: day,
+			categories,
+			measures: ['revenue'],
+			readings: { revenue: categories.map((_, index) => index) },
+		})
+		const tokens = resolveChartTokens()
+		const props = adaptChart({ ...input, tokens })!.props as any
+		const normalized = normalizeAxisChartProps(props)
+		const option = buildAxisChartOption(
+			{ ...normalized.config, type: 'line' },
+			{ tokens, hiddenSeries: [], width: 600, format: normalized.format },
+		)
+		const chart = echarts.init(null as any, null as any, {
+			renderer: 'svg',
+			ssr: true,
+			width: 600,
+			height: 400,
+		})
+		chart.setOption({ ...option, animation: false })
+
+		const values: number[] = (chart as any)
+			.getModel()
+			.getComponent('xAxis')
+			.axis.scale.getTicks()
+			.map((tick: any) => tick.value)
+		const ticks = values.map((value) => {
+			const date = new Date(value)
+			return `${date.getMonth() + 1}-${date.getDate()}`
+		})
+		chart.dispose()
+		// The first and last tick are the axis ends, which frappe-ui pads past a line's data.
+		expect(values[0]).toBeLessThan(Date.parse(categories[0]))
+		expect(values[values.length - 1]).toBeGreaterThan(end)
+		expect(ticks.slice(1, -1)).toEqual([
+			'6-17',
+			'7-1',
+			'7-17',
+			'8-1',
+			'8-17',
+			'9-1',
+			'9-17',
+			'10-1',
+		])
+	})
 })

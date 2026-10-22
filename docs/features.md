@@ -63,7 +63,8 @@ One row per thing a user can do or rely on. Slugs are `<area>.<feature>` in the 
 | query.sql-column | A user adds a column from a raw SQL expression written in the source's dialect. |
 | query.unknown-operation-refused | A pipeline holding an operation this version does not know is refused, not silently skipped. |
 | query.native-sql | A user writes native SQL against a data source and runs it. |
-| query.native-sql-one-statement | Native SQL is one statement over unqualified table names; more than one statement or a schema-qualified name is refused. |
+| query.native-sql-one-statement | Native SQL is one statement; more than one statement, or a table in a schema the data source does not read, is refused. |
+| query.native-sql-schema-qualified | Native SQL on a PostgreSQL data source names a table as `schema.table` for any schema the data source reads. |
 | query.native-sql-format | A user reformats the SQL text. |
 | query.native-sql-schema-explorer | A user browses the source's tables and columns and inserts a name into the SQL. |
 | query.native-sql-autocomplete | The SQL editor autocompletes table and column names. |
@@ -164,6 +165,7 @@ One row per thing a user can do or rely on. Slugs are `<area>.<feature>` in the 
 | charts.number-comparison | A user compares a reading with the previous period, the same period last year, a constant or a measure, and the card states the change. |
 | charts.number-comparison-show | A user prints a comparison as a percent change or as a difference in the value's own units. |
 | charts.number-comparison-caption | A user writes a caption for the comparison row. |
+| charts.number-progress | A user draws a bar under a card for how far its reading has come: towards its target, or out of 100% for a percent. |
 | charts.number-sparkline | A user plots a trend under a card, split one grain finer than its period and filtered the same way. |
 | charts.donut-max-slices | A user caps the slices plotted; the rest collapse into a tail. |
 | charts.donut-inline-labels | A user prints the shares on the slices instead of a legend. |
@@ -234,7 +236,7 @@ One row per thing a user can do or rely on. Slugs are `<area>.<feature>` in the 
 | dashboard.move-resize | A user moves and resizes an item; the item it lands on is pushed out from under it. |
 | dashboard.compact-layout | A user turns gap-closing on or off; a new dashboard closes its gaps. |
 | dashboard.breakpoints | A user arranges the grid per width; a narrow grid stacks cells the author never arranged and keeps the ones they did. |
-| dashboard.cell-height-rule | A Number cell takes the height its reading needs: a delta row when compared, a sparkline band when trended. |
+| dashboard.cell-height-rule | A Number cell takes the height its reading needs: a delta row when compared, a bar when it shows progress, a sparkline band when trended. |
 | dashboard.number-cell-per-reading | A Number chart on a dashboard is one cell per reading, each showing only the reading it names. |
 | dashboard.filter-add | A user adds a dashboard filter with a label and a type. |
 | dashboard.filter-links | A user links a dashboard filter to a chart's column and the chart refilters; an unlinked chart is left alone. |
@@ -274,7 +276,7 @@ One row per thing a user can do or rely on. Slugs are `<area>.<feature>` in the 
 | workbook.delete | A user deletes a workbook and its queries, charts and dashboards go with it. |
 | workbook.add-items | A user adds a query, a chart on the active query, or a dashboard from the sidebar. |
 | workbook.remove-item | A user removes a query, chart or dashboard from the sidebar. |
-| workbook.folders | A user creates, renames and removes folders and moves items into them. |
+| workbook.folders | A user creates, renames and removes folders and moves items into them. Opening an item opens its folder. |
 | workbook.reorder | A user reorders items and folders by dragging, and a stale item in the order is skipped. |
 | workbook.duplicate | A user duplicates a workbook into an independent copy with the same folders. |
 | workbook.copy-paste | A user copies a workbook as JSON and pastes it as a new workbook, every reference pointing at the new copies. |
@@ -336,6 +338,7 @@ One row per thing a user can do or rely on. Slugs are `<area>.<feature>` in the 
 | Slug | Feature |
 |---|---|
 | data-source.connect-mariadb | A user connects a MariaDB database with host, port, database, username and password. |
+| data-source.site-db-socket | The site's own database connects over the socket the site config names, as Frappe does. |
 | data-source.connect-postgres | A user connects a PostgreSQL database, naming a schema. |
 | data-source.connect-clickhouse | A user connects a ClickHouse database. |
 | data-source.connect-duckdb | A user connects a DuckDB file by URL. |
@@ -408,6 +411,7 @@ One row per thing a user can do or rely on. Slugs are `<area>.<feature>` in the 
 | data-store.import-row-limit | An admin caps how many rows an import copies. |
 | data-store.sync-schedule | An admin sets a cron schedule on a stored table, and the table is imported when the schedule is due, counted from its last import. |
 | data-store.list | An admin browses the stored tables and searches them by name. |
+| data-store.import-atomic | A failed import leaves the stored table as it was and no other table behind. |
 | data-store.import-cursor | An incremental import's cursor describes what is in the store, not what a run intended. |
 | data-store.import-script-sandbox | An import job's script reads Frappe data, calls its client and inserts into its table; it cannot write to the site, enqueue a job, call a method, send mail or register a commit hook. |
 | data-store.failed-import-notice | A reader is told when a table's newest import failed, and nothing while one runs or a retry is queued. |
@@ -416,6 +420,7 @@ One row per thing a user can do or rely on. Slugs are `<area>.<feature>` in the 
 | data-store.division-by-zero | A division by zero returns null in the data store, as it does on the live connection. |
 | data-store.cleanup-prunes-stale | The weekly cleanup drops a table no query has used, and keeps one used recently, nested, freshly imported or incremental. |
 | data-store.cleanup-keeps-unexplained | The cleanup deletes only what it can rebuild and keeps an unexplained orphan. |
+| data-store.memory-limit | Every DuckDB connection is held to a memory limit, 4 GB or DuckDB's lower default on a small host, unless the site config sets `insights_duckdb_memory_limit`. |
 | data-store.compaction | The store file is compacted without losing data, and small files are left alone. |
 | data-store.execution-log-retention | Log Settings clears query execution logs past the retention an admin sets; the 90-day default outlasts the cleanup's unused-table window. |
 
